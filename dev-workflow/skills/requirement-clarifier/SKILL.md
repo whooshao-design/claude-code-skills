@@ -3,6 +3,8 @@ name: requirement-clarifier
 description: 需求澄清与规格化。将模糊需求转化为结构化的 req-spec.md，支持用户描述、文件导入、TAPD/JIRA 链接抓取。使用条件：用户需求不清晰、需要结构化需求文档时自动触发。
 version: 1.0.0
 ---
+> **Skill**: requirement-clarifier | **Version**: 1.0.0
+
 
 # 需求澄清系统
 

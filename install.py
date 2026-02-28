@@ -125,7 +125,7 @@ def install_skills(
                 continue
             shutil.rmtree(dst)
 
-        shutil.copytree(src, dst)
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns('CHANGELOG.md'))
         installed += 1
         print(f"  Installed: {skill}")
 

@@ -212,6 +212,7 @@ for group in "${SELECTED_GROUPS[@]}"; do
         fi
 
         cp -r "$src" "$dst"
+        rm -f "$dst/CHANGELOG.md"
         ((installed++))
         echo "  Installed: ${skill}"
     done
