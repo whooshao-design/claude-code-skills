@@ -1,18 +1,20 @@
 #!/bin/bash
 set -e
 
-# claude-code-skills installer - multi-plugin architecture
+# claude-code-skills installer
+# Copies skill directories to ~/.claude/skills/ (User Skills mechanism).
+# Restart Claude Code after installation for skills to take effect.
+#
 # Usage:
-#   bash install.sh                                        # 安装所有插件
-#   bash install.sh --plugins dev-workflow                  # 只安装指定插件
-#   bash install.sh --plugins dev-workflow --skills code-dev,dev-cr  # 插件内选择性安装
-#   bash install.sh --list                                 # 列出可用插件和 skills
-#   bash install.sh --uninstall                            # 卸载所有插件
-#   bash install.sh --uninstall --plugins dev-workflow      # 卸载指定插件
+#   bash install.sh                                         # install all skills
+#   bash install.sh --groups dev-workflow                    # install from specific group
+#   bash install.sh --groups dev-workflow --skills code-dev,dev-cr  # selective install
+#   bash install.sh --list                                  # list available skills
+#   bash install.sh --uninstall                             # uninstall all skills
 
-CLAUDE_DIR="${HOME}/.claude"
+SKILLS_DIR="${HOME}/.claude/skills"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGINS_ARG=""
+GROUPS_ARG=""
 SKILLS_ARG=""
 UNINSTALL=0
 LIST_ONLY=0
@@ -21,8 +23,8 @@ FORCE=0
 # ─── Parse arguments ───
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --plugins)
-            PLUGINS_ARG="$2"
+        --groups)
+            GROUPS_ARG="$2"
             shift 2
             ;;
         --skills)
@@ -41,16 +43,23 @@ while [[ $# -gt 0 ]]; do
             FORCE=1
             shift
             ;;
+        --target)
+            SKILLS_DIR="$2"
+            shift 2
+            ;;
         -h|--help)
             echo "Usage: bash install.sh [OPTIONS]"
             echo ""
+            echo "Copies skills to ~/.claude/skills/ for Claude Code to discover."
+            echo ""
             echo "Options:"
-            echo "  --plugins p1,p2    安装指定插件（逗号分隔）"
-            echo "  --skills s1,s2     插件内选择性安装 skills（需配合单个 --plugins）"
-            echo "  --list             列出所有可用插件和 skills"
-            echo "  --uninstall        卸载插件"
-            echo "  --force            强制覆盖已有安装"
-            echo "  -h, --help         显示帮助"
+            echo "  --groups g1,g2     Install from specific groups (default: all)"
+            echo "  --skills s1,s2     Install specific skills (requires single --groups)"
+            echo "  --list             List available groups and skills"
+            echo "  --uninstall        Uninstall skills"
+            echo "  --force            Overwrite existing skills"
+            echo "  --target DIR       Target directory (default: ~/.claude/skills)"
+            echo "  -h, --help         Show this help"
             exit 0
             ;;
         *)
@@ -60,130 +69,121 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ─── Discover plugins ───
-discover_plugins() {
-    local plugins=()
+# ─── Discovery ───
+discover_groups() {
+    local groups=()
     for dir in "${SCRIPT_DIR}/"*/; do
-        [[ -f "${dir}.claude-plugin/plugin.json" ]] && plugins+=("$(basename "$dir")")
+        if [[ -d "${dir}skills" ]]; then
+            groups+=("$(basename "$dir")")
+        fi
     done
-    echo "${plugins[@]}"
+    echo "${groups[@]}"
 }
 
 get_skills() {
-    local plugin_dir="$1"
+    local group_dir="$1"
     local skills=()
-    for dir in "${plugin_dir}/skills/"*/; do
-        [[ -d "$dir" ]] && skills+=("$(basename "$dir")")
+    for dir in "${group_dir}/skills/"*/; do
+        if [[ -f "${dir}SKILL.md" ]]; then
+            skills+=("$(basename "$dir")")
+        fi
     done
     echo "${skills[@]}"
 }
 
 # ─── List ───
 if [[ $LIST_ONLY -eq 1 ]]; then
-    AVAILABLE_PLUGINS=($(discover_plugins))
-    for plugin in "${AVAILABLE_PLUGINS[@]}"; do
-        echo "Plugin: ${plugin}"
-        skills=($(get_skills "${SCRIPT_DIR}/${plugin}"))
-        echo "  Skills (${#skills[@]}):"
+    AVAILABLE_GROUPS=($(discover_groups))
+    for group in "${AVAILABLE_GROUPS[@]}"; do
+        skills=($(get_skills "${SCRIPT_DIR}/${group}"))
+        echo "Group: ${group} (${#skills[@]} skills)"
         for skill in "${skills[@]}"; do
-            printf "    %-25s\n" "$skill"
+            printf "  %-25s\n" "$skill"
         done
         echo ""
     done
     exit 0
 fi
 
-# ─── Resolve selected plugins ───
-AVAILABLE_PLUGINS=($(discover_plugins))
+# ─── Resolve groups ───
+AVAILABLE_GROUPS=($(discover_groups))
 
-if [[ -z "${AVAILABLE_PLUGINS[*]}" ]]; then
-    echo "Error: no plugins found."
+if [[ -z "${AVAILABLE_GROUPS[*]}" ]]; then
+    echo "Error: no skill groups found."
     exit 1
 fi
 
-if [[ -n "$PLUGINS_ARG" ]]; then
-    IFS=',' read -ra SELECTED_PLUGINS <<< "$PLUGINS_ARG"
-    for plugin in "${SELECTED_PLUGINS[@]}"; do
+if [[ -n "$GROUPS_ARG" ]]; then
+    IFS=',' read -ra SELECTED_GROUPS <<< "$GROUPS_ARG"
+    for group in "${SELECTED_GROUPS[@]}"; do
         found=0
-        for avail in "${AVAILABLE_PLUGINS[@]}"; do
-            [[ "$plugin" == "$avail" ]] && found=1 && break
+        for avail in "${AVAILABLE_GROUPS[@]}"; do
+            [[ "$group" == "$avail" ]] && found=1 && break
         done
         if [[ $found -eq 0 ]]; then
-            echo "Error: plugin '${plugin}' not found."
-            echo "Available: ${AVAILABLE_PLUGINS[*]}"
+            echo "Error: group '${group}' not found."
+            echo "Available: ${AVAILABLE_GROUPS[*]}"
             exit 1
         fi
     done
 else
-    SELECTED_PLUGINS=("${AVAILABLE_PLUGINS[@]}")
+    SELECTED_GROUPS=("${AVAILABLE_GROUPS[@]}")
 fi
 
 # ─── Validate --skills ───
-if [[ -n "$SKILLS_ARG" ]] && [[ ${#SELECTED_PLUGINS[@]} -ne 1 ]]; then
-    echo "Error: --skills can only be used with a single --plugins value."
+if [[ -n "$SKILLS_ARG" ]] && [[ ${#SELECTED_GROUPS[@]} -ne 1 ]]; then
+    echo "Error: --skills requires a single --groups value."
     exit 1
 fi
 
 # ─── Uninstall ───
-uninstall_plugin() {
-    local plugin_name="$1"
-    local plugin_id="${plugin_name}@local"
-    local plugin_dir="${CLAUDE_DIR}/plugins/local/${plugin_name}"
-    echo "Uninstalling: ${plugin_name}"
-
-    if [[ -d "$plugin_dir" ]] || [[ -L "$plugin_dir" ]]; then
-        rm -rf "$plugin_dir"
-        echo "  Removed plugin directory"
-    fi
-
-    if command -v python3 &>/dev/null; then
-        python3 -c "
-import json, os
-for fpath, key in [
-    ('${CLAUDE_DIR}/plugins/installed_plugins.json', 'plugins'),
-    ('${CLAUDE_DIR}/settings.json', 'enabledPlugins'),
-]:
-    if not os.path.exists(fpath):
-        continue
-    with open(fpath, 'r') as f:
-        data = json.load(f)
-    if '${plugin_id}' in data.get(key, {}):
-        del data[key]['${plugin_id}']
-        with open(fpath, 'w') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.write('\\n')
-"
-    fi
-    echo "  Done"
-    echo ""
-}
-
 if [[ $UNINSTALL -eq 1 ]]; then
-    for plugin in "${SELECTED_PLUGINS[@]}"; do
-        uninstall_plugin "$plugin"
+    echo "=== claude-code-skills uninstaller ==="
+    echo ""
+    for group in "${SELECTED_GROUPS[@]}"; do
+        all_skills=($(get_skills "${SCRIPT_DIR}/${group}"))
+        if [[ -n "$SKILLS_ARG" ]]; then
+            IFS=',' read -ra target_skills <<< "$SKILLS_ARG"
+        else
+            target_skills=("${all_skills[@]}")
+        fi
+
+        echo "Uninstalling from: ${group}"
+        removed=0
+        for skill in "${target_skills[@]}"; do
+            dst="${SKILLS_DIR}/${skill}"
+            if [[ -d "$dst" ]]; then
+                rm -rf "$dst"
+                echo "  Removed: ${skill}"
+                ((removed++))
+            fi
+        done
+        echo "  Done: ${removed} removed"
+        echo ""
     done
-    echo "Uninstall completed."
+    echo "Uninstall completed. Restart Claude Code to apply."
     exit 0
 fi
 
 # ─── Install ───
-install_plugin() {
-    local plugin_name="$1"
-    local plugin_id="${plugin_name}@local"
-    local plugin_src="${SCRIPT_DIR}/${plugin_name}"
-    local plugin_dst="${CLAUDE_DIR}/plugins/local/${plugin_name}"
-    local all_skills=($(get_skills "$plugin_src"))
+echo "=== claude-code-skills installer ==="
+echo ""
 
-    # Determine skills to install
+mkdir -p "$SKILLS_DIR"
+
+for group in "${SELECTED_GROUPS[@]}"; do
+    all_skills=($(get_skills "${SCRIPT_DIR}/${group}"))
+
     if [[ -n "$SKILLS_ARG" ]]; then
         IFS=',' read -ra install_skills <<< "$SKILLS_ARG"
+        # Validate
         for skill in "${install_skills[@]}"; do
             found=0
             for avail in "${all_skills[@]}"; do
                 [[ "$skill" == "$avail" ]] && found=1 && break
             done
             if [[ $found -eq 0 ]]; then
-                echo "  Error: skill '${skill}' not found in ${plugin_name}."
+                echo "  Error: skill '${skill}' not found in ${group}."
                 echo "  Available: ${all_skills[*]}"
                 exit 1
             fi
@@ -192,77 +192,35 @@ install_plugin() {
         install_skills=("${all_skills[@]}")
     fi
 
-    echo "Installing plugin: ${plugin_name}"
+    echo "Installing from: ${group}"
+    echo "  Target: ${SKILLS_DIR}"
     echo "  Skills: ${install_skills[*]}"
 
-    # Clean existing
-    if [[ -d "$plugin_dst" ]] || [[ -L "$plugin_dst" ]]; then
-        if [[ $FORCE -eq 0 ]]; then
-            echo "  Already exists: ${plugin_dst}"
-            echo "  Use --force to overwrite."
-            exit 1
-        fi
-        rm -rf "$plugin_dst"
-    fi
-
-    # Create structure
-    mkdir -p "${plugin_dst}/.claude-plugin"
-    mkdir -p "${plugin_dst}/skills"
-
-    # Copy manifest
-    cp "${plugin_src}/.claude-plugin/plugin.json" "${plugin_dst}/.claude-plugin/plugin.json"
-
-    # Symlink skills
+    installed=0
+    skipped=0
     for skill in "${install_skills[@]}"; do
-        ln -s "${plugin_src}/skills/${skill}" "${plugin_dst}/skills/${skill}"
-        echo "  Linked: ${skill}"
+        src="${SCRIPT_DIR}/${group}/skills/${skill}"
+        dst="${SKILLS_DIR}/${skill}"
+
+        if [[ -d "$dst" ]]; then
+            if [[ $FORCE -eq 0 ]]; then
+                echo "  Skip (exists): ${skill}"
+                ((skipped++))
+                continue
+            fi
+            rm -rf "$dst"
+        fi
+
+        cp -r "$src" "$dst"
+        ((installed++))
+        echo "  Installed: ${skill}"
     done
 
-    # Register & enable
-    if command -v python3 &>/dev/null; then
-        python3 -c "
-import json, os
-from datetime import datetime
-
-now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-plugin_id = '${plugin_id}'
-plugin_dst = '${plugin_dst}'
-claude_dir = '${CLAUDE_DIR}'
-
-# Register
-f = os.path.join(claude_dir, 'plugins', 'installed_plugins.json')
-os.makedirs(os.path.dirname(f), exist_ok=True)
-data = json.load(open(f)) if os.path.exists(f) else {'version': 2, 'plugins': {}}
-data.setdefault('plugins', {})[plugin_id] = [{
-    'scope': 'user', 'installPath': plugin_dst,
-    'version': '1.0.0', 'installedAt': now, 'lastUpdated': now
-}]
-with open(f, 'w') as fh:
-    json.dump(data, fh, indent=2, ensure_ascii=False)
-    fh.write('\\n')
-
-# Enable
-f2 = os.path.join(claude_dir, 'settings.json')
-if os.path.exists(f2):
-    data2 = json.load(open(f2))
-    data2.setdefault('enabledPlugins', {})[plugin_id] = True
-    with open(f2, 'w') as fh:
-        json.dump(data2, fh, indent=2, ensure_ascii=False)
-        fh.write('\\n')
-"
-    else
-        echo "  WARNING: python3 not found, skipping plugin registration."
+    echo "  Done: ${installed} installed, ${skipped} skipped"
+    if [[ $skipped -gt 0 ]]; then
+        echo "  Hint: use --force to overwrite existing skills"
     fi
-
-    echo "  Done (${#install_skills[@]}/${#all_skills[@]} skills)"
     echo ""
-}
-
-echo "=== claude-code-skills installer ==="
-echo ""
-
-for plugin in "${SELECTED_PLUGINS[@]}"; do
-    install_plugin "$plugin"
 done
 
 echo "All done! Restart Claude Code to load the new skills."

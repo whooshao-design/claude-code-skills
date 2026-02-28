@@ -1,8 +1,8 @@
 # claude-code-skills
 
-个人 Claude Code 技能套件，支持多插件管理与选择性部署。
+个人 Claude Code 技能套件，支持多工作流组管理与选择性部署。
 
-## 插件列表
+## 技能列表
 
 ### dev-workflow
 
@@ -26,7 +26,7 @@ git clone https://github.com/whooshao-design/claude-code-skills.git
 cd claude-code-skills
 ```
 
-### 安装所有插件
+### 安装所有技能
 
 ```bash
 python3 install.py
@@ -34,19 +34,19 @@ python3 install.py
 bash install.sh
 ```
 
-### 安装指定插件
+### 安装指定工作流组
 
 ```bash
-python3 install.py --plugins dev-workflow
+python3 install.py --groups dev-workflow
 ```
 
-### 插件内选择性安装
+### 选择性安装
 
 ```bash
-python3 install.py --plugins dev-workflow --skills code-dev,test-verify,dev-cr
+python3 install.py --groups dev-workflow --skills code-dev,test-verify,dev-cr
 ```
 
-### 查看可用插件和 skills
+### 查看可用技能
 
 ```bash
 python3 install.py --list
@@ -61,29 +61,22 @@ python3 install.py --force
 ### 卸载
 
 ```bash
-# 卸载所有插件
 python3 install.py --uninstall
-
-# 卸载指定插件
-python3 install.py --uninstall --plugins dev-workflow
+python3 install.py --uninstall --groups dev-workflow --skills code-dev
 ```
 
 ## 安装原理
 
-安装脚本会：
+安装脚本将 skill 目录复制到 `~/.claude/skills/`（User Skills 机制），重启 Claude Code 后自动发现。
 
-1. 自动发现仓库中的插件（含 `.claude-plugin/plugin.json` 的子目录）
-2. 在 `~/.claude/plugins/local/{plugin-name}/` 创建插件目录
-3. 将选中的 skill 目录以**符号链接**方式挂载（修改仓库文件立即生效）
-4. 在 `installed_plugins.json` 中注册插件
-5. 在 `settings.json` 中启用插件
+不修改 `installed_plugins.json` 或 `settings.json`，简单可靠。
 
 ## 目录结构
 
 ```
 claude-code-skills/
-├── dev-workflow/                    # 插件: 开发工作流
-│   ├── .claude-plugin/plugin.json
+├── dev-workflow/                    # 工作流组: 开发工作流
+│   ├── .claude-plugin/plugin.json  # 工作流元数据
 │   └── skills/
 │       ├── requirement-clarifier/
 │       ├── spec-generator/
@@ -91,30 +84,21 @@ claude-code-skills/
 │       ├── code-dev/
 │       ├── test-verify/
 │       └── dev-cr/
-├── future-workflow/                 # 未来可扩展...
-│   ├── .claude-plugin/plugin.json
-│   └── skills/
 ├── install.py
 ├── install.sh
+├── CLAUDE.md
 ├── README.md
 └── .gitignore
 ```
 
 ## 更新 Skills
 
-由于使用符号链接，只需 `git pull` 即可获取最新版本：
-
 ```bash
 cd ~/projects/ai/claude-code-skills
 git pull
+python3 install.py --force   # 重新复制更新后的 skills
 ```
 
-如需增减已安装的 skills，重新运行安装脚本：
+## 添加新工作流组
 
-```bash
-python3 install.py --force --plugins dev-workflow --skills code-dev,test-verify
-```
-
-## 添加新插件
-
-在仓库根目录创建新的子目录，包含 `.claude-plugin/plugin.json` 和 `skills/` 目录即可自动被安装脚本发现。
+在仓库根目录创建新子目录，包含 `skills/` 目录即可自动被安装脚本发现。
