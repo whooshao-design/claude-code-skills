@@ -1,9 +1,9 @@
 ---
 name: test-verify
 description: 代码开发后的测试验证系统。自动探测测试框架，执行单元测试/集成测试，分析失败并尝试修复，生成缺失测试用例，输出覆盖率分析报告。目标技术栈：Java + Maven + TestNG/JUnit + Mockito。使用条件：代码开发完成后需要系统性测试验证时触发。
-version: 1.3.0
+version: 1.4.0
 ---
-> **Skill**: test-verify | **Version**: 1.3.0
+> **Skill**: test-verify | **Version**: 1.4.0
 
 
 # 测试验证工作流（test-verify）
@@ -460,23 +460,25 @@ find . -path "*/site/jacoco/jacoco.csv" -type f 2>/dev/null
 | core | XX% | XX% | XX% | XX% |
 ```
 
-### 5.2 JaCoCo 未配置（静态分析替代）
+### 5.2 JaCoCo 未配置 → 临时注入
 
-基于 git diff 做变更方法 vs 已有测试的对照分析：
+**不使用静态分析替代**，而是临时集成 JaCoCo 获取真实覆盖率数据：
 
-```markdown
-| 模块 | 变更类 | 变更方法 | 测试覆盖 | 备注 |
-|------|--------|----------|----------|------|
-| core | XxxService | methodA | COVERED | XxxServiceTest.test_xxx |
-| core | YyyLogic | methodB | MISSING | 建议补充 |
-| impl | ZzzHandler | methodC | PARTIAL | 缺少异常分支 |
+#### 5.2.1 备份 pom.xml
+
+```bash
+# 备份变更模块的 pom.xml
+for module in {affected_modules}; do
+  cp "${module}/pom.xml" "${module}/pom.xml.bak"
+done
 ```
 
-### 5.3 JaCoCo 配置建议
+#### 5.2.2 注入 JaCoCo 插件
 
-未配置时，在报告中提供配置片段：
+在变更涉及的每个模块的 `pom.xml` 中，向 `<build><plugins>` 节点添加：
 
 ```xml
+<!-- [TEMP] JaCoCo - 临时注入，勿提交 -->
 <plugin>
   <groupId>org.jacoco</groupId>
   <artifactId>jacoco-maven-plugin</artifactId>
@@ -493,6 +495,57 @@ find . -path "*/site/jacoco/jacoco.csv" -type f 2>/dev/null
   </executions>
 </plugin>
 ```
+
+注入规则：
+- 只注入变更涉及的模块，不修改父 pom
+- 如果 `<build><plugins>` 节点不存在，需创建完整结构
+- 使用 XML 注释 `<!-- [TEMP] -->` 标记，便于回滚时确认
+
+#### 5.2.3 运行覆盖率采集
+
+```bash
+mvn -pl {module} test jacoco:report 2>&1
+find . -path "*/site/jacoco/jacoco.csv" -type f 2>/dev/null
+```
+
+解析 CSV，输出覆盖率数据（与 5.1 相同格式）。
+
+#### 5.2.4 恢复 pom.xml（关键步骤）
+
+覆盖率数据采集完成后，**立即恢复所有 pom.xml**：
+
+```bash
+# 恢复备份
+for module in {affected_modules}; do
+  mv "${module}/pom.xml.bak" "${module}/pom.xml"
+done
+```
+
+验证恢复成功：
+
+```bash
+# 确认 pom.xml 无变更
+git diff --name-only | grep pom.xml
+# 应该无输出，如有输出说明恢复失败
+```
+
+**绝对原则**：
+- JaCoCo 注入仅用于覆盖率采集，**绝不提交到 git**
+- 恢复 pom.xml 是 Step 5.2 的必须步骤，即使测试失败也要执行
+- 如果恢复失败，在报告中标记 `WARN: pom.xml 恢复失败，请手动检查`
+- Step 5 完成后通过 `git diff` 确认 pom.xml 无变更
+
+### 5.3 覆盖率报告（通用）
+
+无论 JaCoCo 是原有配置还是临时注入，输出统一格式：
+
+```markdown
+| 模块 | 类覆盖率 | 方法覆盖率 | 行覆盖率 | 分支覆盖率 | 数据来源 |
+|------|----------|-----------|----------|-----------|----------|
+| core | XX% | XX% | XX% | XX% | JaCoCo(原有) / JaCoCo(临时注入) |
+```
+
+> 报告中标注数据来源，便于用户了解覆盖率是真实数据还是估算。
 
 ---
 
