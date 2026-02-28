@@ -1,8 +1,12 @@
 # claude-code-skills
 
-个人 Claude Code 技能套件，支持选择性部署到任意 Claude Code 环境。
+个人 Claude Code 技能套件，支持多插件管理与选择性部署。
 
-## Skills
+## 插件列表
+
+### dev-workflow
+
+开发生命周期工作流技能套件。
 
 | Skill | 说明 |
 |---|---|
@@ -22,7 +26,7 @@ git clone https://github.com/whooshao-design/claude-code-skills.git
 cd claude-code-skills
 ```
 
-### 全量安装
+### 安装所有插件
 
 ```bash
 python3 install.py
@@ -30,15 +34,19 @@ python3 install.py
 bash install.sh
 ```
 
-### 选择性安装
+### 安装指定插件
 
 ```bash
-python3 install.py --skills code-dev,test-verify,dev-cr
-# 或
-bash install.sh --skills code-dev,test-verify,dev-cr
+python3 install.py --plugins dev-workflow
 ```
 
-### 查看可用 skills
+### 插件内选择性安装
+
+```bash
+python3 install.py --plugins dev-workflow --skills code-dev,test-verify,dev-cr
+```
+
+### 查看可用插件和 skills
 
 ```bash
 python3 install.py --list
@@ -53,16 +61,20 @@ python3 install.py --force
 ### 卸载
 
 ```bash
+# 卸载所有插件
 python3 install.py --uninstall
+
+# 卸载指定插件
+python3 install.py --uninstall --plugins dev-workflow
 ```
 
 ## 安装原理
 
 安装脚本会：
 
-1. 在 `~/.claude/plugins/local/claude-code-skills/` 创建插件目录
-2. 复制 `plugin.json` 插件清单
-3. 将选中的 skill 目录以**符号链接**方式挂载（修改仓库文件立即生效，无需重装）
+1. 自动发现仓库中的插件（含 `.claude-plugin/plugin.json` 的子目录）
+2. 在 `~/.claude/plugins/local/{plugin-name}/` 创建插件目录
+3. 将选中的 skill 目录以**符号链接**方式挂载（修改仓库文件立即生效）
 4. 在 `installed_plugins.json` 中注册插件
 5. 在 `settings.json` 中启用插件
 
@@ -70,15 +82,18 @@ python3 install.py --uninstall
 
 ```
 claude-code-skills/
-├── .claude-plugin/
-│   └── plugin.json
-├── skills/
-│   ├── requirement-clarifier/
-│   ├── spec-generator/
-│   ├── tech-review/
-│   ├── code-dev/
-│   ├── test-verify/
-│   └── dev-cr/
+├── dev-workflow/                    # 插件: 开发工作流
+│   ├── .claude-plugin/plugin.json
+│   └── skills/
+│       ├── requirement-clarifier/
+│       ├── spec-generator/
+│       ├── tech-review/
+│       ├── code-dev/
+│       ├── test-verify/
+│       └── dev-cr/
+├── future-workflow/                 # 未来可扩展...
+│   ├── .claude-plugin/plugin.json
+│   └── skills/
 ├── install.py
 ├── install.sh
 ├── README.md
@@ -97,5 +112,9 @@ git pull
 如需增减已安装的 skills，重新运行安装脚本：
 
 ```bash
-python3 install.py --force --skills code-dev,test-verify
+python3 install.py --force --plugins dev-workflow --skills code-dev,test-verify
 ```
+
+## 添加新插件
+
+在仓库根目录创建新的子目录，包含 `.claude-plugin/plugin.json` 和 `skills/` 目录即可自动被安装脚本发现。
