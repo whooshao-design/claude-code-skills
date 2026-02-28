@@ -1,6 +1,7 @@
 ---
 name: test-verify
 description: 代码开发后的测试验证系统。自动探测测试框架，执行单元测试/集成测试，分析失败并尝试修复，生成缺失测试用例，输出覆盖率分析报告。目标技术栈：Java + Maven + TestNG/JUnit + Mockito。使用条件：代码开发完成后需要系统性测试验证时触发。
+version: 1.0.0
 ---
 
 # 测试验证工作流（test-verify）

@@ -1,6 +1,7 @@
 ---
 name: spec-generator
 description: 技术方案与开发计划生成器。根据需求规格（req-spec.md）和代码分析，自动生成 tech-spec.md 和 dev-plan.md。使用条件：需求澄清完成后，或用户要求设计技术方案时触发。
+version: 1.0.0
 ---
 
 # 方案设计系统
