@@ -1,4 +1,5 @@
 ---
+name: dev-cr
 description: 证据驱动的代码评审系统。自动采集 git diff、构建、测试、覆盖率证据，4 角色多维度审查，输出 Top 10 去重问题 + 可执行修复方案。目标技术栈：Java + DB + Redis + MQ，Maven 构建。使用条件：用户要求代码评审、CR、review 时触发。
 ---
 

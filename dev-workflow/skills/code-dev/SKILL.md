@@ -1,4 +1,5 @@
 ---
+name: code-dev
 description: 基于开发计划的代码开发工作流。读取 dev-plan.md 按任务逐步开发，内置核心代码规范检查，支持 Claude 主 Agent / Codex / Claude 子代理三种后端。使用条件：用户要求开发代码、实现功能、或有 dev-plan.md 需要执行时触发。
 ---
 
