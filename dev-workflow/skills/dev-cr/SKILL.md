@@ -1,9 +1,9 @@
 ---
 name: dev-cr
 description: 证据驱动的代码评审系统。自动采集 git diff、构建、测试、覆盖率证据，4 角色多维度审查，输出 Top 10 去重问题 + 可执行修复方案。目标技术栈：Java + DB + Redis + MQ，Maven 构建。使用条件：用户要求代码评审、CR、review 时触发。
-version: 1.2.0
+version: 1.3.0
 ---
-> **Skill**: dev-cr | **Version**: 1.2.0
+> **Skill**: dev-cr | **Version**: 1.3.0
 
 
 # 证据驱动代码评审系统
@@ -335,6 +335,15 @@ if (affected == 0) {
 - 是否符合现有架构分层
 - 是否有循环依赖
 - 新增接口是否有统一封装
+
+**数据模型简洁性检查**（新增 VO / DTO / 缓存结构时必检）：
+
+| 检查项 | 说明 | 反例 |
+|--------|------|------|
+| 冗余字段 | 能从其他字段推导出的字段不应独立存储 | 同时存储 `groupToEditionMapping` 和按 editionId 索引的 `grayRoutes`，实际可以直接用 groupId 作 key |
+| Map key 选择 | 能一步查表的不应引入中间映射 | `mapping.get(groupId)` → `editionId` → `routes.get(editionId)` 可简化为 `routes.get(groupId)` |
+| 字段间隐含依赖 | 多个字段的 key/value 存在关联时考虑合并 | A 的 key 是 B 的 value，说明可以合并为一个 Map |
+| 注释与代码一致性 | 注释中的类型描述必须与实际代码匹配 | 注释写 "key:灰度分组id" 但实际 key 是 editionId |
 
 **tech-spec.md 基准对比**（如 Step 0.5 探测到技术方案）：
 - 实现是否与技术方案设计一致
