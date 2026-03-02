@@ -1,5 +1,15 @@
 # test-verify Changelog
 
+## [2.5.0] - 2026-02-28
+
+### Changed
+- **Maven 构建策略优化**：解决跨模块项目中 FindBugs/PMD 阻断构建的问题
+  - Step 1.1 和 Step 3.1 统一使用 `mvn clean test -pl {module} -am` 替代分步 install
+  - `-am`（also-make）让 reactor 一次构建所有依赖模块，避免旧版 jar 导致测试失败
+  - 跳过静态分析插件（`-Dfindbugs.skip=true` 等），覆盖率采集不需要静态分析
+  - 不使用 `mvn verify`，避免触发不必要的 post-test 阶段插件
+  - 测试执行与报告生成分两步：先 `test`，再单独 `jacoco:report`
+
 ## [2.4.0] - 2026-02-28
 
 ### Added

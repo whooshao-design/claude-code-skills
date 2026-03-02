@@ -1,9 +1,9 @@
 ---
 name: test-verify
 description: 代码开发后的单元测试验证系统。覆盖率驱动的闭环验证：执行单元测试→修复失败→采集JaCoCo覆盖率→门控检查→补充用例，循环直到变更代码行覆盖率≥80%。目标技术栈：Java + Maven + TestNG/JUnit + Mockito。使用条件：代码开发完成后需要系统性测试验证时触发。
-version: 2.4.0
+version: 2.5.0
 ---
-> **Skill**: test-verify | **Version**: 2.4.0
+> **Skill**: test-verify | **Version**: 2.5.0
 
 
 # 测试验证工作流（test-verify）
@@ -237,13 +237,19 @@ git diff --name-only HEAD~1...HEAD -- "*.java" | grep "Test.java"
 
 ### 1.1 运行 checkin 级别测试
 
-按探测到的模块逐一运行：
+使用 `-am`（also-make）让 Maven reactor 自动构建依赖模块，避免分步 install 被 FindBugs/PMD 等插件阻断：
 
 ```bash
-# 示例：运行 core 模块 checkin suite
-mvn -pl {module-name} test \
-  -DsuiteXmlFile=src/test/resources/testng_ut_checkin.xml 2>&1
+# 示例：运行 impl 模块 checkin suite，-am 自动构建依赖的 core 模块
+mvn clean test -pl {test-module} -am \
+  -DsuiteXmlFile=src/test/resources/testng_ut_checkin.xml \
+  -Dfindbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true 2>&1
 ```
+
+**为什么用 `-am` 而非分步 install + test**：
+- 分步 `install` 可能被 FindBugs 等插件阻断，导致 core 模块未安装到本地仓库
+- impl 测试会加载本地仓库中的旧版本 core jar，引发诡异的测试失败
+- `-am` 让 Maven reactor 在同一构建中编译所有依赖模块，确保使用最新代码
 
 **绝对原则**：自动执行命令采集结果，不要求用户粘贴输出。
 
@@ -353,24 +359,33 @@ Step 1 失败用例列表
 
 | 措施 | 原因 |
 |------|------|
-| 使用 `mvn clean verify` | 确保编译+测试+报告在同一生命周期，避免增量编译导致的 class ID 不匹配 |
+| 使用 `mvn clean test -pl -am` | `-am` 让 reactor 一次构建所有依赖模块，避免分步 install 被 FindBugs 阻断 |
+| 跳过静态分析插件 | `-Dfindbugs.skip=true` 等，覆盖率采集不需要静态分析，加速构建 |
 | 采集期间禁止修改代码 | JaCoCo 注入到报告生成之间，源码变更会导致 exec 文件与 .class 文件不匹配 |
 | 采集后校验 class ID | exec 文件的 class ID 必须与 .class 文件一致，否则覆盖率数据无效 |
 
 **根据项目结构选择命令**：
 
 ```bash
-# 单模块结构：在子模块运行
-mvn -pl {module} clean verify jacoco:report 2>&1
+# 单模块结构：在测试模块运行，-am 自动构建依赖
+mvn clean test -pl {test-module} -am \
+  -DsuiteXmlFile=src/test/resources/testng_ut_checkin.xml \
+  -Dfindbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true 2>&1
+# 然后单独生成报告
+mvn jacoco:report -pl {test-module} -q 2>&1
 
-# 跨模块结构：在根目录运行聚合报告
-mvn clean verify jacoco:report-aggregate 2>&1
+# 跨模块结构：在根目录运行，-am 构建所有依赖模块
+mvn clean test -pl {test-module} -am \
+  -DsuiteXmlFile=src/test/resources/testng_ut_checkin.xml \
+  -Dfindbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true 2>&1
+# 然后在根目录生成聚合报告
+mvn jacoco:report-aggregate -q 2>&1
 ```
 
-**为什么用 `verify` 而非 `test`**：
-- `mvn test` → 只执行到 test 阶段，jacoco:report 需要单独调用
-- `mvn verify` → 自动执行 test + 所有 post-test 阶段（包括 jacoco:report）
-- 避免「先编译 → 再测试 → 再生成报告」的分步执行，减少中间状态不一致风险
+**为什么用 `-am` + 跳过静态分析**：
+- `-am`（also-make）：让 Maven reactor 在同一构建中编译依赖模块，避免分步 install 被 FindBugs 等插件阻断
+- `-Dfindbugs.skip=true` 等：覆盖率采集阶段不需要静态分析，跳过可避免构建中断且加快速度
+- 不使用 `mvn verify`：避免触发不必要的 post-test 阶段插件
 
 **采集期间禁止事项**：
 
